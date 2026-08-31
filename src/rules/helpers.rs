@@ -18,6 +18,8 @@
 //!   are not a general-purpose escape routine; do not pass arbitrary user
 //!   data through them.
 
+use std::collections::HashSet;
+
 use crate::models::NormalizedTool;
 use serde_json::Value;
 
@@ -215,14 +217,28 @@ pub fn has_scope_hint(description: Option<&str>, schema: &Value) -> bool {
     false
 }
 
-/// Return whether the tool name or description contains any inputful
-/// marker (input, payload, send, submit, ...).
-pub fn looks_like_inputful_tool(name: &str, description: Option<&str>) -> bool {
-    let name_lower = name.trim().to_ascii_lowercase();
-    let desc_lower = normalize_text(description);
-    INPUTFUL_TOOL_MARKERS
-        .iter()
-        .any(|m| name_lower.contains(m) || desc_lower.contains(m))
+/// Return whether the tool **name** contains any inputful marker (input,
+/// payload, send, submit, ...).
+///
+/// Matches on **whole alphanumeric tokens** in the tool name only — not in
+/// the description. Descriptions are free-form prose where domain words
+/// like `Merge Request`, `SQL query`, or `response body` collide with
+/// markers and produce spurious `weak_input_schema` / `missing_schema_type`
+/// findings on tools that deliberately declare no inputs. The tool name,
+/// by contrast, is a compact developer-controlled identifier, so a marker
+/// appearing there is a far stronger signal that the tool accepts
+/// free-form input. Regressions that motivated this scoping:
+///
+/// * `workspace_context` with description "Get workspace metadata..." used
+///   to match the `data` marker as a substring of `metadata`
+///   (<https://github.com/lee-to/mcpunit/issues>).
+/// * A GitLab projects listing tool with description containing
+///   `Merge Request` used to match the `request` marker despite declaring
+///   no inputs (<https://github.com/lee-to/mcpunit/issues/3>).
+pub fn looks_like_inputful_tool(name: &str) -> bool {
+    let haystack = name.trim().to_ascii_lowercase();
+    let tokens: HashSet<String> = alnum_tokens(&haystack).into_iter().collect();
+    INPUTFUL_TOOL_MARKERS.iter().any(|m| tokens.contains(*m))
 }
 
 // ---------- Single-quoted repr helpers -------------------------------------
@@ -363,10 +379,27 @@ mod tests {
     }
 
     #[test]
-    fn looks_like_inputful_tool_matches_name_or_description() {
-        assert!(looks_like_inputful_tool("submit_form", None));
-        assert!(looks_like_inputful_tool("any", Some("send a payload")));
-        assert!(!looks_like_inputful_tool("abc", Some("static")));
+    fn looks_like_inputful_tool_matches_on_name_only() {
+        assert!(looks_like_inputful_tool("submit_form"));
+        assert!(looks_like_inputful_tool("send_payload"));
+        assert!(!looks_like_inputful_tool("abc"));
+        // Description content must not influence the decision — prose is
+        // too noisy a signal (see GitHub issue #3).
+        assert!(!looks_like_inputful_tool("list_gitlab_projects"));
+    }
+
+    #[test]
+    fn looks_like_inputful_tool_requires_whole_token_match() {
+        // Regression: previously `"metadata".contains("data")` would match
+        // the `data` marker as a substring and spuriously flag tools with
+        // a deliberately empty-but-strict schema. Whole-token matching
+        // must reject substring hits while still catching legitimate
+        // inputful markers that appear as their own tokens.
+        assert!(!looks_like_inputful_tool("workspace_context"));
+        // `database` contains `data` as substring; must not match either.
+        assert!(!looks_like_inputful_tool("connect_database"));
+        // Sanity: legitimate token matches still fire.
+        assert!(looks_like_inputful_tool("send_body"));
     }
 
     #[test]

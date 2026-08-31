@@ -6,7 +6,7 @@
       "tool": {
         "driver": {
           "name": "mcpunit",
-          "semanticVersion": "1.0.0",
+          "semanticVersion": "1.4.0",
           "rules": [
             {
               "id": "duplicate_tool_names",
@@ -513,6 +513,188 @@
                 "bucket": "ergonomics",
                 "score_impact": 10
               }
+            },
+            {
+              "id": "prompt_duplicate_name",
+              "name": "Duplicate prompt names",
+              "shortDescription": {
+                "text": "Duplicate prompt names"
+              },
+              "fullDescription": {
+                "text": "Prompt names should be unique within one MCP server."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "help": {
+                "text": "Prompt names should be unique within one MCP server. Severity: error. Score impact: 20."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "identity",
+                  "prompt-identity",
+                  "metadata_hygiene",
+                  "conformance"
+                ],
+                "precision": "medium",
+                "problem.severity": "error",
+                "risk_category": "metadata_hygiene",
+                "bucket": "conformance",
+                "score_impact": 20
+              }
+            },
+            {
+              "id": "prompt_duplicate_argument_name",
+              "name": "Duplicate prompt argument name",
+              "shortDescription": {
+                "text": "Duplicate prompt argument name"
+              },
+              "fullDescription": {
+                "text": "Argument names must be unique within a single prompt so client-side dictionaries do not silently overwrite values."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "help": {
+                "text": "Argument names must be unique within a single prompt so client-side dictionaries do not silently overwrite values. Severity: error. Score impact: 20."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "identity",
+                  "arguments",
+                  "prompt-identity",
+                  "metadata_hygiene",
+                  "conformance"
+                ],
+                "precision": "medium",
+                "problem.severity": "error",
+                "risk_category": "metadata_hygiene",
+                "bucket": "conformance",
+                "score_impact": 20
+              }
+            },
+            {
+              "id": "prompt_missing_description",
+              "name": "Prompt missing description",
+              "shortDescription": {
+                "text": "Prompt missing description"
+              },
+              "fullDescription": {
+                "text": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "help": {
+                "text": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only. Severity: info. Score impact: 0."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "description",
+                  "prompt-description",
+                  "metadata_hygiene",
+                  "metadata"
+                ],
+                "precision": "medium",
+                "problem.severity": "recommendation",
+                "risk_category": "metadata_hygiene",
+                "bucket": "metadata",
+                "score_impact": 0
+              }
+            },
+            {
+              "id": "prompt_description_too_short",
+              "name": "Prompt description too short",
+              "shortDescription": {
+                "text": "Prompt description too short"
+              },
+              "fullDescription": {
+                "text": "Very short descriptions do not give the agent enough signal to pick the right prompt. Advisory only — the MCP spec does not impose a minimum length."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "help": {
+                "text": "Very short descriptions do not give the agent enough signal to pick the right prompt. Advisory only — the MCP spec does not impose a minimum length. Severity: info. Score impact: 0."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "description",
+                  "prompt-description",
+                  "metadata_hygiene",
+                  "metadata"
+                ],
+                "precision": "medium",
+                "problem.severity": "recommendation",
+                "risk_category": "metadata_hygiene",
+                "bucket": "metadata",
+                "score_impact": 0
+              }
+            },
+            {
+              "id": "prompt_description_matches_name",
+              "name": "Prompt description restates the name",
+              "shortDescription": {
+                "text": "Prompt description restates the name"
+              },
+              "fullDescription": {
+                "text": "Descriptions should add information beyond the prompt's identifier. Advisory only — the MCP spec does not require descriptions to differ from names."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "help": {
+                "text": "Descriptions should add information beyond the prompt's identifier. Advisory only — the MCP spec does not require descriptions to differ from names. Severity: info. Score impact: 0."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "description",
+                  "prompt-description",
+                  "metadata_hygiene",
+                  "metadata"
+                ],
+                "precision": "medium",
+                "problem.severity": "recommendation",
+                "risk_category": "metadata_hygiene",
+                "bucket": "metadata",
+                "score_impact": 0
+              }
+            },
+            {
+              "id": "prompt_argument_missing_description",
+              "name": "Prompt argument missing description",
+              "shortDescription": {
+                "text": "Prompt argument missing description"
+              },
+              "fullDescription": {
+                "text": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "help": {
+                "text": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only. Severity: info. Score impact: 0."
+              },
+              "properties": {
+                "tags": [
+                  "prompts",
+                  "description",
+                  "arguments",
+                  "prompt-description",
+                  "metadata_hygiene",
+                  "metadata"
+                ],
+                "precision": "medium",
+                "problem.severity": "recommendation",
+                "risk_category": "metadata_hygiene",
+                "bucket": "metadata",
+                "score_impact": 0
+              }
             }
           ]
         }
@@ -520,7 +702,7 @@
       "invocations": [
         {
           "executionSuccessful": true,
-          "endTimeUtc": "2026-04-11T18:06:14.015630+00:00",
+          "endTimeUtc": "2026-04-23T08:26:32.039755+00:00",
           "workingDirectory": {
             "uri": "file:///Users/macos/Projects/2080/mcpunit"
           }
@@ -531,7 +713,7 @@
         "tool_name": "mcpunit",
         "report_schema_id": "https://mcpunit.cutcode.dev/schema/audit/v1",
         "report_schema_version": "1",
-        "scan_timestamp": "2026-04-11T18:06:14.015630+00:00",
+        "scan_timestamp": "2026-04-23T08:26:32.039755+00:00",
         "total_score": 10,
         "category_scores": {
           "conformance": {
@@ -556,7 +738,7 @@
             "score": 100,
             "max_score": 100,
             "penalty_points": 0,
-            "finding_count": 0
+            "finding_count": 2
           }
         },
         "why_this_score": "Score is driven mainly by security findings in command execution and file system and ergonomics findings.",
@@ -588,6 +770,27 @@
             "check_title": "Overly generic tool name",
             "check_rationale": "Tool names should communicate behavior clearly."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://do_it"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "do_it",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "tool_name='do_it'"
+              }
+            }
+          ],
           "rule": {
             "id": "overly_generic_tool_name"
           }
@@ -616,6 +819,27 @@
             "check_title": "Vague tool description",
             "check_rationale": "Tool descriptions should clearly explain what the tool does."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://do_it"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "do_it",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "description='Helps with stuff.'"
+              }
+            }
+          ],
           "rule": {
             "id": "vague_tool_description"
           }
@@ -643,6 +867,27 @@
             "check_title": "Schema allows arbitrary properties",
             "check_rationale": "Tool input schemas should not allow arbitrary top-level properties."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://debug_payload"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "debug_payload",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "additionalProperties=True"
+              }
+            }
+          ],
           "rule": {
             "id": "schema_allows_arbitrary_properties"
           }
@@ -669,6 +914,27 @@
             "check_title": "Weak input schema",
             "check_rationale": "Tool input schemas should constrain free-form payloads clearly."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://debug_payload"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "debug_payload",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "matched_heuristic=inputful_tool_with_empty_object_schema"
+              }
+            }
+          ],
           "rule": {
             "id": "weak_input_schema"
           }
@@ -697,6 +963,27 @@
             "check_title": "Dangerous execution tool",
             "check_rationale": "Tools that execute host shell commands are high risk."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://exec_command"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "exec_command",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "name_markers=['exec', 'command']"
+              }
+            }
+          ],
           "rule": {
             "id": "dangerous_exec_tool"
           }
@@ -726,6 +1013,27 @@
             "check_title": "Dangerous filesystem write tool",
             "check_rationale": "Tools that write files on disk are high risk."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://write_file"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "write_file",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "write_markers=['write']"
+              }
+            }
+          ],
           "rule": {
             "id": "dangerous_fs_write_tool"
           }
@@ -753,8 +1061,124 @@
             "check_title": "Write tool without scope hint",
             "check_rationale": "Filesystem mutation tools should document scope constraints clearly."
           },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-tool://write_file"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "write_file",
+                  "kind": "function"
+                }
+              ],
+              "message": {
+                "text": "path_keys=['path']"
+              }
+            }
+          ],
           "rule": {
             "id": "write_tool_without_scope_hint"
+          }
+        },
+        {
+          "ruleId": "prompt_missing_description",
+          "ruleIndex": 19,
+          "level": "note",
+          "message": {
+            "text": "Prompt 'summarize' has no description."
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "ff48b3d1f85ea07420e37b9f2ea3a49929263d0507ea0c0a1302065cfe6961b5"
+          },
+          "properties": {
+            "risk_category": "metadata_hygiene",
+            "bucket": "metadata",
+            "score_impact": 0,
+            "tool_name": null,
+            "finding_category": "prompt-description",
+            "evidence": [
+              "prompt_name=summarize"
+            ],
+            "check_title": "Prompt missing description",
+            "check_rationale": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-server://stdio:[\"./target/release/examples/demo\"]"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "stdio:[\"./target/release/examples/demo\"]",
+                  "kind": "module"
+                }
+              ],
+              "message": {
+                "text": "prompt_name=summarize"
+              }
+            }
+          ],
+          "rule": {
+            "id": "prompt_missing_description"
+          }
+        },
+        {
+          "ruleId": "prompt_argument_missing_description",
+          "ruleIndex": 22,
+          "level": "note",
+          "message": {
+            "text": "Prompt 'translate' has 1 argument(s) without description."
+          },
+          "partialFingerprints": {
+            "primaryLocationLineHash": "260d8a1fbac8a0f2186fdbd9adeb45e90fdd83e911be895ddcc6e63b4fa33259"
+          },
+          "properties": {
+            "risk_category": "metadata_hygiene",
+            "bucket": "metadata",
+            "score_impact": 0,
+            "tool_name": null,
+            "finding_category": "prompt-description",
+            "evidence": [
+              "prompt_name=translate",
+              "arguments_missing_description=['lang']"
+            ],
+            "check_title": "Prompt argument missing description",
+            "check_rationale": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "mcp-server://stdio:[\"./target/release/examples/demo\"]"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "stdio:[\"./target/release/examples/demo\"]",
+                  "kind": "module"
+                }
+              ],
+              "message": {
+                "text": "prompt_name=translate"
+              }
+            }
+          ],
+          "rule": {
+            "id": "prompt_argument_missing_description"
           }
         }
       ]

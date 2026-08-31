@@ -98,6 +98,43 @@ fn scan_round_trips_sse_responses() {
 }
 
 #[test]
+fn prompts_only_server_scans_and_discovers_prompts() {
+    // Regression + feature: MCP spec allows servers to advertise only
+    // `prompts`. The scan must skip `tools/list`, issue `prompts/list`,
+    // and surface the discovered prompts on `server.prompts`.
+    const PROMPTS_ONLY_INIT: &str = r#"{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"prompts":{}},"serverInfo":{"name":"prompts-only","version":"0.1.0"}}}"#;
+    const PROMPTS_LIST: &str = r#"{"jsonrpc":"2.0","id":2,"result":{"prompts":[{"name":"summarize","description":"Summarise the given text","arguments":[{"name":"text","description":"source text","required":true}]}]}}"#;
+    let port = spawn_mock(vec![
+        ok_json(PROMPTS_ONLY_INIT),
+        ok_json(""),
+        ok_json(PROMPTS_LIST),
+    ]);
+    let mut transport = HttpTransport::new(
+        HttpConfig::new(format!("http://127.0.0.1:{port}/mcp"))
+            .with_timeout(Duration::from_secs(5)),
+    )
+    .unwrap();
+    let server = transport.scan("http:prompts-only".into()).unwrap();
+    assert_eq!(server.name.as_deref(), Some("prompts-only"));
+    assert!(
+        server.tools.is_empty(),
+        "prompts-only server must scan with no tools"
+    );
+    assert_eq!(
+        server.metadata.get("has_tools_capability"),
+        Some(&serde_json::Value::Bool(false)),
+    );
+    assert_eq!(
+        server.metadata.get("has_prompts_capability"),
+        Some(&serde_json::Value::Bool(true)),
+    );
+    assert_eq!(server.prompts.len(), 1);
+    assert_eq!(server.prompts[0].name, "summarize");
+    assert_eq!(server.prompts[0].arguments.len(), 1);
+    assert_eq!(server.prompts[0].arguments[0].required, Some(true));
+}
+
+#[test]
 fn non_2xx_response_surfaces_protocol_error() {
     let status =
         b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 9\r\nConnection: close\r\n\r\nbad stuff"

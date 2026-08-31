@@ -4,13 +4,13 @@
     "version": "1",
     "generator": {
       "name": "mcpunit",
-      "version": "1.0.0"
+      "version": "1.4.0"
     }
   },
-  "scan": {
-    "timestamp": "2026-04-11T18:06:14.015630+00:00",
+  "test": {
+    "timestamp": "2026-04-23T08:26:32.039755+00:00",
     "target": {
-      "raw": "stdio:[\"target/release/examples/demo\"]",
+      "raw": "stdio:[\"./target/release/examples/demo\"]",
       "transport": "stdio",
       "description": "Local MCP server launched over stdio.",
       "server": {
@@ -19,6 +19,8 @@
         "protocol_version": null
       },
       "metadata": {
+        "has_prompts_capability": true,
+        "has_tools_capability": true,
         "instructions": "Demo server used by mcpunit to regenerate the reports under `.reports/`.",
         "protocol_version": "2025-11-25"
       }
@@ -144,14 +146,17 @@
         "score": 100,
         "max_score": 100,
         "penalty_points": 0,
-        "finding_count": 0,
-        "rule_penalties": {}
+        "finding_count": 2,
+        "rule_penalties": {
+          "prompt_missing_description": 0,
+          "prompt_argument_missing_description": 0
+        }
       }
     },
     "finding_counts": {
-      "total": 7,
+      "total": 9,
       "by_severity": {
-        "info": 0,
+        "info": 2,
         "warning": 5,
         "error": 2
       },
@@ -167,6 +172,10 @@
         "conformance": {
           "finding_count": 1,
           "penalty_points": 10
+        },
+        "metadata": {
+          "finding_count": 2,
+          "penalty_points": 0
         }
       }
     },
@@ -420,6 +429,92 @@
         "transport",
         "size"
       ]
+    },
+    {
+      "id": "prompt_duplicate_name",
+      "title": "Duplicate prompt names",
+      "bucket": "conformance",
+      "severity": "error",
+      "rationale": "Prompt names should be unique within one MCP server.",
+      "category": "prompt-identity",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 20,
+      "tags": [
+        "prompts",
+        "identity"
+      ]
+    },
+    {
+      "id": "prompt_duplicate_argument_name",
+      "title": "Duplicate prompt argument name",
+      "bucket": "conformance",
+      "severity": "error",
+      "rationale": "Argument names must be unique within a single prompt so client-side dictionaries do not silently overwrite values.",
+      "category": "prompt-identity",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 20,
+      "tags": [
+        "prompts",
+        "identity",
+        "arguments"
+      ]
+    },
+    {
+      "id": "prompt_missing_description",
+      "title": "Prompt missing description",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 0,
+      "tags": [
+        "prompts",
+        "description"
+      ]
+    },
+    {
+      "id": "prompt_description_too_short",
+      "title": "Prompt description too short",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Very short descriptions do not give the agent enough signal to pick the right prompt. Advisory only — the MCP spec does not impose a minimum length.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 0,
+      "tags": [
+        "prompts",
+        "description"
+      ]
+    },
+    {
+      "id": "prompt_description_matches_name",
+      "title": "Prompt description restates the name",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Descriptions should add information beyond the prompt's identifier. Advisory only — the MCP spec does not require descriptions to differ from names.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 0,
+      "tags": [
+        "prompts",
+        "description"
+      ]
+    },
+    {
+      "id": "prompt_argument_missing_description",
+      "title": "Prompt argument missing description",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "score_impact": 0,
+      "tags": [
+        "prompts",
+        "description",
+        "arguments"
+      ]
     }
   ],
   "findings": [
@@ -536,6 +631,37 @@
         "scope_hint=<missing>"
       ],
       "score_impact": 10
+    },
+    {
+      "rule_id": "prompt_missing_description",
+      "title": "Prompt missing description",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "tool_name": null,
+      "message": "Prompt 'summarize' has no description.",
+      "evidence": [
+        "prompt_name=summarize"
+      ],
+      "score_impact": 0
+    },
+    {
+      "rule_id": "prompt_argument_missing_description",
+      "title": "Prompt argument missing description",
+      "bucket": "metadata",
+      "severity": "info",
+      "rationale": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only.",
+      "category": "prompt-description",
+      "risk_category": "metadata_hygiene",
+      "tool_name": null,
+      "message": "Prompt 'translate' has 1 argument(s) without description.",
+      "evidence": [
+        "prompt_name=translate",
+        "arguments_missing_description=['lang']"
+      ],
+      "score_impact": 0
     }
   ],
   "findings_by_bucket": [
@@ -637,6 +763,36 @@
           "rationale": "Tool input schemas should not allow arbitrary top-level properties.",
           "message": "Tool 'debug_payload' allows arbitrary additional input properties.",
           "score_impact": 10
+        }
+      ]
+    },
+    {
+      "bucket": "metadata",
+      "label": "metadata",
+      "finding_count": 2,
+      "penalty_points": 0,
+      "findings": [
+        {
+          "id": "prompt_missing_description",
+          "title": "Prompt missing description",
+          "severity": "info",
+          "bucket": "metadata",
+          "risk_category": "metadata_hygiene",
+          "tool_name": null,
+          "rationale": "Prompts without descriptions force the agent to guess intent from the name alone. The MCP spec marks the field optional, so this is advisory only.",
+          "message": "Prompt 'summarize' has no description.",
+          "score_impact": 0
+        },
+        {
+          "id": "prompt_argument_missing_description",
+          "title": "Prompt argument missing description",
+          "severity": "info",
+          "bucket": "metadata",
+          "risk_category": "metadata_hygiene",
+          "tool_name": null,
+          "rationale": "Agents have no way to fill prompt arguments correctly if each is undocumented. The MCP spec does not require argument descriptions, so this is advisory only.",
+          "message": "Prompt 'translate' has 1 argument(s) without description.",
+          "score_impact": 0
         }
       ]
     }

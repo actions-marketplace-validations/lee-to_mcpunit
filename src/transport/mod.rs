@@ -24,7 +24,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use serde::Serialize;
 
 use crate::error::Result;
-use crate::models::{NormalizedServer, NormalizedTool};
+use crate::models::{NormalizedPrompt, NormalizedServer, NormalizedTool};
 use crate::{MCP_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS};
 
 pub use jsonrpc::{JsonRpcError, JsonRpcId, JsonRpcMessage};
@@ -61,6 +61,16 @@ pub struct InitializeResult {
     pub server_name: Option<String>,
     pub server_version: Option<String>,
     pub instructions: Option<String>,
+    /// Whether the server advertised `capabilities.tools` in its initialize
+    /// response. MCP servers are free to advertise only `prompts` or
+    /// `resources`, so a missing tools capability is not a protocol error —
+    /// the default `scan` impl simply skips `tools/list` in that case.
+    pub has_tools_capability: bool,
+    /// Whether the server advertised `capabilities.prompts`. When present
+    /// the default `scan` impl issues `prompts/list` and populates
+    /// [`NormalizedServer::prompts`] so prompt-hygiene rules have something
+    /// to inspect.
+    pub has_prompts_capability: bool,
     pub raw: serde_json::Value,
 }
 
@@ -83,6 +93,11 @@ pub trait Transport {
     /// `nextCursor` pagination if present.
     fn list_tools(&mut self) -> Result<Vec<NormalizedTool>>;
 
+    /// Enumerate prompts via one or more `prompts/list` calls, following
+    /// `nextCursor` pagination if present. Mirrors [`Transport::list_tools`]
+    /// for the prompts surface.
+    fn list_prompts(&mut self) -> Result<Vec<NormalizedPrompt>>;
+
     /// Populate and return a [`NormalizedServer`] by chaining the above
     /// methods in the right order. Default impl covers the common case;
     /// transports that need to short-circuit (e.g. HTTP with a cached
@@ -91,12 +106,26 @@ pub trait Transport {
         let client_info = ClientInfo::default_for_crate();
         let init = self.initialize(client_info)?;
         self.notify_initialized()?;
-        let tools = self.list_tools()?;
+        let tools = if init.has_tools_capability {
+            self.list_tools()?
+        } else {
+            tracing::info!(
+                "server did not advertise tools capability — skipping tools/list; \
+                 tool-related rules will see an empty tool set"
+            );
+            Vec::new()
+        };
+        let prompts = if init.has_prompts_capability {
+            self.list_prompts()?
+        } else {
+            Vec::new()
+        };
 
         let mut server = NormalizedServer::new(target);
         server.name = init.server_name.clone();
         server.version = init.server_version.clone();
         server.tools = tools;
+        server.prompts = prompts;
         if let Some(instructions) = init.instructions {
             server.metadata.insert(
                 "instructions".to_string(),
@@ -106,6 +135,14 @@ pub trait Transport {
         server.metadata.insert(
             "protocol_version".to_string(),
             serde_json::Value::String(init.protocol_version),
+        );
+        server.metadata.insert(
+            "has_tools_capability".to_string(),
+            serde_json::Value::Bool(init.has_tools_capability),
+        );
+        server.metadata.insert(
+            "has_prompts_capability".to_string(),
+            serde_json::Value::Bool(init.has_prompts_capability),
         );
         server.response_sizes.extend(self.take_response_sizes());
         Ok(server)

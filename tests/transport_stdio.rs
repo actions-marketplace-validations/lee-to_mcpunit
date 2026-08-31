@@ -88,6 +88,63 @@ fn server_exit_before_response_raises_startup_error() {
 }
 
 #[test]
+fn prompts_only_server_scans_and_discovers_prompts() {
+    // Regression + feature: MCP spec allows servers to advertise only
+    // `prompts`. `scan` must skip `tools/list`, issue `prompts/list`,
+    // and surface the parsed prompts on `server.prompts`.
+    let script = r#"
+set -e
+read _init
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"prompts":{}},"serverInfo":{"name":"prompts-only","version":"0.1.0"}}}'
+read _notif
+read _list
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"prompts":[{"name":"summarize","description":"Summarise the given text","arguments":[{"name":"text","description":"source text","required":true}]}]}}'
+"#;
+    let mut transport = StdioTransport::spawn(config(script)).unwrap();
+    let server = transport.scan("stdio:prompts-only".into()).unwrap();
+    assert_eq!(server.name.as_deref(), Some("prompts-only"));
+    assert!(
+        server.tools.is_empty(),
+        "prompts-only server must scan with no tools"
+    );
+    assert_eq!(
+        server.metadata.get("has_tools_capability"),
+        Some(&serde_json::Value::Bool(false)),
+    );
+    assert_eq!(
+        server.metadata.get("has_prompts_capability"),
+        Some(&serde_json::Value::Bool(true)),
+    );
+    assert_eq!(server.prompts.len(), 1);
+    let summarize = &server.prompts[0];
+    assert_eq!(summarize.name, "summarize");
+    assert_eq!(
+        summarize.description.as_deref(),
+        Some("Summarise the given text")
+    );
+    assert_eq!(summarize.arguments.len(), 1);
+    assert_eq!(summarize.arguments[0].name, "text");
+    assert_eq!(summarize.arguments[0].required, Some(true));
+}
+
+#[test]
+fn resources_only_server_scans_without_protocol_error() {
+    let script = r#"
+set -e
+read _init
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","capabilities":{"resources":{}},"serverInfo":{"name":"res-only","version":"0.1.0"}}}'
+read _notif
+"#;
+    let mut transport = StdioTransport::spawn(config(script)).unwrap();
+    let server = transport.scan("stdio:res-only".into()).unwrap();
+    assert!(server.tools.is_empty());
+    assert_eq!(
+        server.metadata.get("has_tools_capability"),
+        Some(&serde_json::Value::Bool(false))
+    );
+}
+
+#[test]
 fn repeated_cursor_is_rejected() {
     let script = r#"
 set -e

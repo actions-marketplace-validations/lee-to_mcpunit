@@ -66,7 +66,7 @@ impl Rule for MissingType {
                 .as_object()
                 .map(|o| o.is_empty())
                 .unwrap_or(true);
-            if is_empty && !looks_like_inputful_tool(&tool.name, tool.description.as_deref()) {
+            if is_empty && !looks_like_inputful_tool(&tool.name) {
                 continue;
             }
             let message = format!(
@@ -210,14 +210,14 @@ fn weak_input_reasons(tool: &NormalizedTool) -> Vec<String> {
     }
 
     let Some(properties) = schema_properties(&tool.input_schema) else {
-        if looks_like_inputful_tool(&tool.name, tool.description.as_deref()) {
+        if looks_like_inputful_tool(&tool.name) {
             return vec!["matched_heuristic=inputful_tool_with_empty_object_schema".to_string()];
         }
         return Vec::new();
     };
 
     if properties.is_empty() {
-        if looks_like_inputful_tool(&tool.name, tool.description.as_deref()) {
+        if looks_like_inputful_tool(&tool.name) {
             return vec!["matched_heuristic=inputful_tool_with_empty_object_schema".to_string()];
         }
         return Vec::new();
@@ -263,7 +263,35 @@ fn weak_input_reasons(tool: &NormalizedTool) -> Vec<String> {
 /// Rule: `missing_required_for_critical_fields`. Fires when a critical
 /// field (`command`, `path`, `url`, ...) is declared but left optional in
 /// the `required` array.
+///
+/// Skipped for tools whose name begins with a read-style verb (`find_`,
+/// `search_`, `get_`, `list_`, `lookup_`, `fetch_`, ...). These tools
+/// expose critical fields as mutually optional filters, e.g.
+/// `find_page(url?, spaceKey?, title?)`, which is a legitimate lookup
+/// shape rather than a hygiene bug. The MCP spec never mandates that
+/// `url`/`path`/`command` live in `required`, so treating every
+/// critical-named property as missing-required produces false positives
+/// on search tools. See <https://github.com/lee-to/mcpunit/issues/2>.
 pub struct MissingRequiredCritical;
+
+/// Tool-name prefixes that mark read-only / lookup semantics. Matched
+/// against the first alphanumeric token of the tool name — a tool named
+/// `find_confluence_pages` is considered read-style, but one named
+/// `findandreplace` (no separator) is not, to keep the check
+/// conservative.
+const READ_STYLE_NAME_PREFIXES: &[&str] = &[
+    "find", "search", "get", "list", "lookup", "fetch", "read", "query", "show", "describe",
+    "inspect", "view", "check",
+];
+
+fn has_read_style_name(name: &str) -> bool {
+    let lowered = name.trim().to_ascii_lowercase();
+    let first_token: String = lowered
+        .chars()
+        .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        .collect();
+    READ_STYLE_NAME_PREFIXES.iter().any(|p| first_token == *p)
+}
 
 const CRITICAL_REQUIRED_KEYS: &[&str] = &[
     "command",
@@ -307,6 +335,12 @@ impl Rule for MissingRequiredCritical {
             if schema_type(&tool.input_schema) != Some("object") {
                 continue;
             }
+            // Read-style / lookup tools legitimately expose critical
+            // fields as mutually optional filters (issue #2).
+            if has_read_style_name(&tool.name) {
+                continue;
+            }
+
             let property_names = schema_property_names(&tool.input_schema);
             let required_fields = schema_required_fields(&tool.input_schema);
 
@@ -423,6 +457,28 @@ mod tests {
     // WeakInput
 
     #[test]
+    fn weak_input_skips_no_arg_tool_with_domain_request_in_description() {
+        // Regression for https://github.com/lee-to/mcpunit/issues/3:
+        // a Russian-language description containing the domain phrase
+        // "Merge Request" used to match the `request` inputful marker via
+        // description, firing `weak_input_schema` on a tool that
+        // deliberately declares no inputs.
+        let mut server = NormalizedServer::new("test");
+        server.tools.push(with_schema(
+            "list_gitlab_projects",
+            Some(
+                "Возвращает список доступных GitLab-проектов. Используйте, \
+                 когда нужно подобрать `projectId` и имя проекта перед \
+                 следующими операциями с Merge Request, файлами или \
+                 другими GitLab-методами.",
+            ),
+            serde_json::json!({"type": "object"}),
+        ));
+        assert!(WeakInput.evaluate(&server).is_empty());
+        assert!(MissingType.evaluate(&server).is_empty());
+    }
+
+    #[test]
     fn weak_input_fires_on_empty_object_for_inputful_tool() {
         let mut server = NormalizedServer::new("test");
         server.tools.push(with_schema(
@@ -480,6 +536,30 @@ mod tests {
         let findings = MissingRequiredCritical.evaluate(&server);
         assert_eq!(findings.len(), 1);
         assert!(findings[0].evidence[0].contains("'path'"));
+    }
+
+    #[test]
+    fn missing_required_skips_all_optional_filter_schema() {
+        // Regression for https://github.com/lee-to/mcpunit/issues/2: a
+        // Confluence page lookup tool exposes `url`, `spaceKey`, `title`,
+        // and `limit` as mutually optional filters. The MCP spec does not
+        // require `url` to sit in `required`, and flagging this shape
+        // produced a false positive on a legitimate search tool.
+        let mut server = NormalizedServer::new("test");
+        server.tools.push(with_schema(
+            "find_confluence_pages",
+            Some("Find pages by url, short url, spaceKey + title, or title."),
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string"},
+                    "spaceKey": {"type": "string"},
+                    "title": {"type": "string"},
+                    "limit": {"type": "integer"}
+                }
+            }),
+        ));
+        assert!(MissingRequiredCritical.evaluate(&server).is_empty());
     }
 
     #[test]

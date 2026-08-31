@@ -14,7 +14,7 @@ footguns in your MCP server — **before your agents ever touch them**.
 [![Binary size](https://img.shields.io/badge/binary-%3C%205%20MB-brightgreen)](#-fast-and-tiny)
 [![Written in Rust](https://img.shields.io/badge/built%20with-Rust-orange?logo=rust)](https://www.rust-lang.org)
 
-**One command. Zero config. 17 deterministic rules. JSON + SARIF + Markdown.**
+**One command. Zero config. 24 deterministic rules across tools and prompts. JSON + SARIF + Markdown.**
 
 ⚡ **Sub-second cold-start.** &nbsp;·&nbsp; 📦 **< 5 MB binary.**
 &nbsp;·&nbsp; 🪶 **Zero runtime dependencies.**
@@ -96,13 +96,16 @@ Pick one:
 curl -L https://github.com/lee-to/mcpunit/releases/latest/download/mcpunit-x86_64-unknown-linux-gnu.tar.gz | tar -xz
 ./mcpunit --version
 
+# Alpine / distroless / scratch — use the static musl build
+curl -L https://github.com/lee-to/mcpunit/releases/latest/download/mcpunit-x86_64-unknown-linux-musl.tar.gz | tar -xz
+
 # Or build from source
 cargo install --git https://github.com/lee-to/mcpunit --locked
 ```
 
-Prebuilt binaries ship for Linux (x64 + arm64), macOS (Intel + Apple
-Silicon), and Windows — all statically linked, all **under 5 MB on
-disk**. See [releases](https://github.com/lee-to/mcpunit/releases).
+Prebuilt binaries ship for Linux (x64 + arm64, both **glibc** and static
+**musl** for Alpine), macOS (Intel + Apple Silicon), and Windows — all
+**under 5 MB on disk**. See [releases](https://github.com/lee-to/mcpunit/releases).
 
 ### 2. Test your MCP server
 
@@ -189,7 +192,7 @@ jobs:
       contents: read
       security-events: write  # for SARIF upload
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -210,9 +213,12 @@ Every input is documented in [`action.yml`](./action.yml).
 
 ## 🎯 What mcpunit catches
 
-**17 rules across four categories.** Every rule ships with a stable
+**24 rules across five categories.** Every rule ships with a stable
 `rule_id`, deterministic evidence strings, and a fixed score penalty
-— so you can diff two audits and get a sensible answer.
+— so you can diff two audits and get a sensible answer. 17 rules cover
+the tool surface (`tools/list`); 7 rules cover the prompt surface
+(`prompts/list`) so prompts-only and mixed servers get a real audit
+instead of a handshake-sanity check.
 
 Severity levels and score penalty:
 
@@ -247,6 +253,12 @@ Quick reference:
 | 15 | `write_tool_without_scope_hint` | `WARNING` | ergonomics |
 | 16 | `tool_description_mentions_destructive_access` | `WARNING` | metadata |
 | 17 | `response_too_large` | `WARNING` / `ERROR` | ergonomics |
+| 18 | `prompt_duplicate_name` | `ERROR` | conformance |
+| 19 | `prompt_duplicate_argument_name` | `ERROR` | conformance |
+| 20 | `prompt_missing_description` | `INFO` | metadata |
+| 21 | `prompt_description_too_short` | `INFO` | metadata |
+| 22 | `prompt_description_matches_name` | `INFO` | metadata |
+| 23 | `prompt_argument_missing_description` | `INFO` | metadata |
 
 Deep dive by category follows.
 
@@ -484,6 +496,98 @@ servers by domain.
 
 **How to fix:** if your `tools/list` is too large, you probably have
 too many tools in one server. Split by bounded context.
+
+### 💬 Prompts — hygiene for the `prompts/list` surface
+
+MCP servers may expose prompts (parameterised message templates) in
+addition to — or instead of — tools. A server like
+[vjik/my-prompts-mcp](https://github.com/vjik/my-prompts-mcp) serves
+only prompts and still deserves a real audit: the model reads prompt
+name, description, and arguments the same way it reads a tool's, and
+the same cost structure applies (bad metadata → wrong selection →
+broken user flow).
+
+mcpunit discovers prompts via `prompts/list` when the server
+advertises `capabilities.prompts` in `initialize`. A server that
+advertises only tools, only prompts, or both is a first-class audit
+target.
+
+#### `prompt_duplicate_name` — `ERROR`
+
+**What it catches.** Two prompts published under the same `name`.
+
+**Why it matters.** `prompts/get` routes by name — collisions make
+the call non-deterministic on the server itself and are almost always
+a bug. Same cost structure as duplicate tool names.
+
+**Example evidence:** `duplicate_count=2`, `prompt_name=summarize`.
+
+#### `prompt_duplicate_argument_name` — `ERROR`
+
+**What it catches.** A single prompt that declares two or more
+arguments with the same `name`.
+
+**Why it matters.** The client builds a dictionary from the arguments
+by name when invoking `prompts/get`. Duplicates silently overwrite
+each other, and the call fails or returns garbage. The MCP spec
+implies per-prompt argument uniqueness; this rule enforces it.
+
+#### `prompt_missing_description` — `INFO`
+
+**What it catches.** Prompts with no `description` field, or one that
+is empty after trimming.
+
+**Why it matters.** The MCP spec (2025-11-25) explicitly marks
+`Prompt.description` as *Optional*, so omitting it is spec-valid. The
+rule still surfaces the absence as an advisory — without a description
+the agent has only the prompt name to infer intent — but severity is
+`INFO`, which carries no score penalty. Contrast with
+`missing_tool_description`, where the spec does **not** mark
+`Tool.description` as optional (compare its wording with the explicitly
+*"Optional"* `Tool.title`), so that rule stays `WARNING`.
+
+#### `prompt_description_too_short` — `INFO`
+
+**What it catches.** Non-empty descriptions shorter than 20
+characters — the length at which hand-written descriptions typically
+stop being one-word stubs like `"Summarise."`.
+
+**Why it matters.** Agents pick a prompt by reading the description.
+Anything shorter than a short sentence carries almost no signal
+beyond the name itself. Severity is `INFO` because the MCP spec sets
+no minimum length, and since an empty description is already
+spec-valid (and only surfaced as `INFO`), a short-but-present one
+cannot reasonably be stricter.
+
+**How to fix:** write one sentence that says what the prompt produces
+and when to use it.
+
+#### `prompt_description_matches_name` — `INFO`
+
+**What it catches.** Descriptions that are literally the prompt name
+after case/punctuation normalisation. `translate` with description
+`"Translate"` fires; `translate` with `"Translate input text to the
+target language."` does not.
+
+**Why it matters.** A restated name is a stub. The model learns
+nothing from it that the name itself did not already carry. Severity
+is `INFO` because the MCP spec does not require descriptions to
+differ from names (nor does it require descriptions at all), so this
+is advisory only — zero score penalty.
+
+#### `prompt_argument_missing_description` — `INFO`
+
+**What it catches.** Any declared argument whose `description` field
+is missing or empty. One finding per offending prompt (with the full
+list of bad arguments in evidence), not one per argument.
+
+**Why it matters.** The model fills prompt arguments by matching each
+against a mental model of what it is for. Undocumented arguments
+force it to guess from the name alone — which is unreliable exactly
+when the prompt mixes several string fields with overlapping vocab
+(e.g. `source`, `target`, `destination`). The MCP spec does not
+mark `PromptArgument.description` as required, so severity is `INFO`
+(advisory only, zero score penalty).
 
 ## 📄 What the reports look like
 
